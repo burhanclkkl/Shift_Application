@@ -328,7 +328,7 @@
   border-right: 1px solid var(--border-color);
   border-bottom: 1px solid var(--border-color);
   text-align: left;
-  padding: 1.25rem 1rem;
+  padding: 0.5rem 1rem;
   font-size: 0.8rem;
   font-weight: 700;
   color: var(--text-secondary);
@@ -363,7 +363,7 @@
 
 /* Sol Kolon Hücreleri (Şablon Bilgisi) */
 .template-cell-info {
-  padding: 1.25rem 1rem;
+  padding: 0.5rem 1rem;
   border-right: 1px solid var(--border-color);
   border-bottom: 1px solid var(--border-color);
   background: var(--bg-dark-soft);
@@ -387,13 +387,14 @@
 
 /* Sürükle Bırak Bırakma Hücreleri */
 .planner-drop-zone-cell {
-  padding: 0.5rem;
+  padding: 0;
   border-right: 1px solid rgba(15, 23, 42, 0.04);
   border-bottom: 1px solid var(--border-color);
   background: #ffffff;
   transition: var(--transition-fast);
   vertical-align: top;
-  height: 120px;
+  height: 36px;
+  position: relative;
 }
 
 .planner-drag-table td:last-child {
@@ -418,12 +419,101 @@
 
 /* Hücre İçi Personel Rozeti Yerleşimi */
 .dropped-employees-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none; /* Let drag events pass through to cell */
+}
+
+/* Yeni Zaman Çizelgesi Modeli Vardiya Bloğu */
+.absolute-shift-block {
+  position: absolute;
+  border-radius: var(--radius-md);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
-  max-height: 105px;
-  overflow-y: auto;
-  padding-right: 0.15rem;
+  padding: 0.5rem;
+  overflow: hidden;
+  z-index: 10;
+  transition: box-shadow 0.2s, filter 0.2s;
+  pointer-events: auto; /* Re-enable pointer events for the block itself */
+  border-left: 4px solid rgba(0, 0, 0, 0.2);
+}
+
+.absolute-shift-block:hover {
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+  z-index: 15;
+}
+
+.absolute-shift-block.resizing {
+  opacity: 0.8;
+  z-index: 20;
+  transition: none;
+}
+
+.shift-block-time {
+  font-size: 0.65rem;
+  font-weight: 800;
+  color: rgba(0, 0, 0, 0.6);
+  margin-bottom: 0.15rem;
+  white-space: nowrap;
+}
+
+.shift-block-name {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: rgba(0, 0, 0, 0.85);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex-grow: 1;
+}
+
+.shift-block-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.25rem;
+  margin-top: 0.25rem;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.absolute-shift-block:hover .shift-block-actions {
+  opacity: 1;
+}
+
+.shift-resizer {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 8px;
+  cursor: ns-resize;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 5;
+}
+
+.shift-resizer-bottom {
+  bottom: 0;
+}
+
+.shift-resizer-top {
+  top: 0;
+}
+
+.shift-resizer::after {
+  content: '';
+  width: 20px;
+  height: 3px;
+  background-color: rgba(0, 0, 0, 0.2);
+  border-radius: 2px;
+}
+
+.shift-resizer:hover::after {
+  background-color: rgba(0, 0, 0, 0.5);
 }
 
 .dropped-employee-badge {
@@ -989,4 +1079,560 @@
 .modal-save-btn:active {
   transform: translateY(0);
   box-shadow: 0 3px 8px rgba(124, 58, 237, 0.22);
+}
+
+.expanded-col {
+  /* No hardcoded width needed anymore, it flexes to 100% since other columns are hidden */
+}
+
+.day-col-header, .planner-drop-zone-cell {
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), min-width 0.3s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.day-header-top-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  width: 100%;
+}
+
+.day-header-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.expand-day-btn {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.expand-day-btn:hover {
+  background: rgba(15, 23, 42, 0.05);
+  color: var(--primary-color);
+}
+
+/* Top Actions in Shift Block */
+.shift-block-time {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  width: 100%;
+}
+
+.shift-time-text {
+  flex-grow: 1;
+}
+
+.absolute-shift-block:hover .shift-block-actions.top-actions {
+  opacity: 1;
+}
+
+.shift-block-actions.top-actions {
+  margin-top: 0;
+  margin-bottom: 2px;
+}
+
+/* Context Menu */
+.shift-context-menu {
+  position: fixed;
+  z-index: 10000;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15), 0 4px 10px rgba(0, 0, 0, 0.05);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 150px;
+  border: 1px solid var(--border-color);
+  animation: contextMenuFadeIn 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes contextMenuFadeIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.shift-context-menu button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  font-weight: 500;
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.2s;
+}
+
+.shift-context-menu button:hover {
+  background: var(--bg-color);
+}
+
+.shift-context-menu button.danger {
+  color: var(--error-color);
+}
+
+.shift-context-menu button.danger:hover {
+  background: #fef2f2;
+}
+
+/* Remove old shift block actions */
+.shift-block-actions {
+  display: none !important;
+}
+
+/* Planner Employee Filter */
+.planner-emp-filter-container {
+  display: flex;
+  align-items: center;
+  background: white;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 4px 8px;
+  margin-top: 12px;
+}
+
+.planner-emp-filter-container .filter-icon {
+  color: var(--text-muted);
+  margin-right: 6px;
+}
+
+.planner-emp-filter-input {
+  border: none;
+  outline: none;
+  font-size: 0.8rem;
+  width: 100%;
+  color: var(--text-primary);
+  background: transparent;
+}
+
+/* Alternating row colors for better readability */
+.planner-drag-table tbody tr:nth-child(even) .planner-drop-zone-cell {
+  background-color: #f8fafc;
+}
+
+.planner-drag-table tbody tr:nth-child(even) .template-cell-info {
+  background-color: #f1f5f9;
+}
+
+/* =========================================
+   PREMIUM SETTINGS & PROFILE TAB
+   ========================================= */
+.settings-container {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2rem;
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 1rem 0;
+  animation: slideUp 0.4s ease-out;
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (min-width: 1024px) {
+  .settings-container {
+    grid-template-columns: 1fr 1.5fr;
+  }
+}
+
+.settings-card {
+  background: #ffffff;
+  border-radius: 16px;
+  border: 1px solid rgba(226, 232, 240, 0.6);
+  box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.settings-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.08);
+}
+
+/* Premium License Card - Light Modern Theme */
+.license-card {
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+  color: #1e293b;
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  height: fit-content;
+  position: relative;
+  overflow: hidden;
+}
+
+.license-card::after {
+  content: '';
+  position: absolute;
+  top: -20px; right: -20px; width: 200px; height: 200px;
+  background: radial-gradient(circle, rgba(16, 185, 129, 0.08) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.settings-card-header {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 1.5rem 2rem;
+}
+
+.settings-card-header h3 {
+  margin: 0;
+}
+
+.license-card .settings-card-header {
+  background: transparent;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.license-card .settings-card-header h3 {
+  color: #0f172a;
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.license-card .icon-blue {
+  color: #3b82f6;
+  background: rgba(59, 130, 246, 0.1);
+  padding: 8px;
+  border-radius: 10px;
+}
+
+.license-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  margin-bottom: 1rem;
+}
+
+.license-card .stat-label {
+  color: #64748b;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-size: 0.85rem;
+}
+
+.license-card .stat-value {
+  font-size: 3rem;
+  font-weight: 800;
+  display: block;
+  margin-top: 0.2rem;
+  letter-spacing: -1px;
+}
+
+.license-card .stat-value.success { 
+  background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.license-card .stat-value.danger { 
+  background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.license-card .license-note {
+  color: #64748b;
+  font-size: 0.95rem;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px dashed #e2e8f0;
+}
+
+/* Form Card */
+.form-card .settings-card-header {
+  background: #ffffff;
+  padding: 1.5rem;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.form-card .settings-card-header h3 {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.form-card .icon-purple { color: #8b5cf6; background: rgba(139, 92, 246, 0.1); padding: 8px; border-radius: 10px; }
+.form-card .icon-red { color: #ef4444; background: rgba(239, 68, 68, 0.1); padding: 8px; border-radius: 10px; }
+
+.settings-card-body {
+  padding: 2rem;
+}
+
+.settings-form .form-group {
+  margin-bottom: 2rem;
+  position: relative;
+}
+
+.settings-form label {
+  display: block;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #475569;
+  margin-bottom: 0.75rem;
+  line-height: 1.4;
+}
+
+.settings-form input {
+  width: 100%;
+  padding: 1rem 1.25rem;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  font-size: 1rem;
+  color: #1e293b;
+  font-weight: 500;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.settings-form input:focus {
+  background: #ffffff;
+  outline: none;
+  border-color: #8b5cf6;
+  box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.15);
+}
+
+.disabled-input {
+  background: #f1f5f9 !important;
+  color: #94a3b8 !important;
+  cursor: not-allowed;
+  border-color: #e2e8f0 !important;
+}
+
+.input-hint {
+  display: block;
+  font-size: 0.8rem;
+  color: #94a3b8;
+  margin-top: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.input-hint::before {
+  content: 'ⓘ';
+  font-size: 0.9rem;
+}
+
+.save-settings-btn {
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  color: white;
+  border: none;
+  padding: 1rem 1.5rem;
+  border-radius: 12px;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  width: 100%;
+  margin-top: 1.5rem;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.25);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+}
+
+.save-settings-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(99, 102, 241, 0.35);
+}
+
+.save-settings-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.save-settings-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  background: #94a3b8;
+  box-shadow: none;
+}
+
+.form-alert {
+  padding: 1rem 1.25rem;
+  border-radius: 10px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin-top: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  animation: slideUp 0.3s ease;
+}
+
+.form-alert.success {
+  background: rgba(16, 185, 129, 0.1);
+  color: #059669;
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.form-alert.success::before {
+  content: '✓';
+  font-size: 1.2rem;
+}
+
+.form-alert.error {
+  background: rgba(239, 68, 68, 0.1);
+  color: #dc2626;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.form-alert.error::before {
+  content: '⚠';
+  font-size: 1.2rem;
+}
+
+/* Modern Today Shifts Widget */
+.summary-card-header-modern {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+  border-bottom: 1px solid #f1f5f9;
+  padding-bottom: 1rem;
+}
+
+.summary-card-header-modern .icon-wrapper {
+  background: rgba(59, 130, 246, 0.1);
+  padding: 8px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.summary-card-header-modern h3 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.date-badge {
+  font-size: 0.75rem;
+  background: #f1f5f9;
+  color: #64748b;
+  padding: 0.2rem 0.6rem;
+  border-radius: 20px;
+  font-weight: 600;
+}
+
+.today-shifts-modern-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-height: 300px;
+  overflow-y: auto;
+  padding-right: 0.5rem;
+}
+
+.modern-shift-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #f8fafc;
+  border: 1px solid #f1f5f9;
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  transition: all 0.2s ease;
+}
+
+.modern-shift-item:hover {
+  background: #ffffff;
+  border-color: #e2e8f0;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+  transform: translateX(4px);
+}
+
+.shift-emp-info {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.emp-avatar-small {
+  width: 32px;
+  height: 32px;
+  background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%);
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.shift-emp-info .emp-name {
+  font-weight: 600;
+  color: #334155;
+  font-size: 0.95rem;
+}
+
+.shift-time-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: rgba(16, 185, 129, 0.1);
+  color: #059669;
+  padding: 0.4rem 0.75rem;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.empty-shifts-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2.5rem 1rem;
+  text-align: center;
+  background: #f8fafc;
+  border-radius: 12px;
+  border: 1px dashed #cbd5e1;
+}
+
+.empty-icon-circle {
+  width: 56px;
+  height: 56px;
+  background: #f1f5f9;
+  color: #94a3b8;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 1rem;
+}
+
+.empty-shifts-state p {
+  color: #475569;
+  font-weight: 600;
+  margin: 0 0 0.5rem 0;
+}
+
+.empty-shifts-state .empty-hint {
+  color: #94a3b8;
+  font-size: 0.85rem;
 }

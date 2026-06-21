@@ -1,26 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../config';
+import { LayoutDashboard, Building2, Users, Calendar, Settings, Activity, LogOut, User, RefreshCw, AlertCircle, Zap, Shield, Search, X, Inbox, GripVertical, Edit, Moon, Sun, Maximize2, Minimize2, Download, ChevronLeft, ChevronRight, Clock, Building } from 'lucide-react';
+import ExcelJS from 'exceljs';
+import { saveAs } from 'file-saver';
 import './AdminDashboard.css';
 
-const hourlySlots = [
-  { start: '08:00', end: '09:00' },
-  { start: '09:00', end: '10:00' },
-  { start: '10:00', end: '11:00' },
-  { start: '11:00', end: '12:00' },
-  { start: '12:00', end: '13:00' },
-  { start: '13:00', end: '14:00' },
-  { start: '14:00', end: '15:00' },
-  { start: '15:00', end: '16:00' },
-  { start: '16:00', end: '17:00' },
-  { start: '17:00', end: '18:00' },
-  { start: '18:00', end: '19:00' },
-  { start: '19:00', end: '20:00' },
-  { start: '20:00', end: '21:00' },
-  { start: '21:00', end: '22:00' },
-  { start: '22:00', end: '23:00' },
-  { start: '23:00', end: '00:00' }
-];
+const hourlySlots = Array.from({ length: 24 }).map((_, i) => {
+  const start = String(i).padStart(2, '0') + ':00';
+  const end = String(i + 1 === 24 ? 0 : i + 1).padStart(2, '0') + ':00';
+  return { start, end };
+});
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -85,7 +75,68 @@ const AdminDashboard = () => {
   const [templateAssignModal, setTemplateAssignModal] = useState(null); // { employeeId, dateStr }
 
   // Vardiya düzenleme modal state'i
-  const [editingShiftModal, setEditingShiftModal] = useState(null); // { shiftId, employeeId, employeeName, dateStr, startTime, endTime }
+  const [editingShiftModal, setEditingShiftModal] = useState(null);
+  const [confirmModal, setConfirmModal] = useState(null);
+  const [showNightHours, setShowNightHours] = useState(false);
+  const [expandedDay, setExpandedDay] = useState(null);
+  const [contextMenu, setContextMenu] = useState(null);
+  const [plannerEmpFilter, setPlannerEmpFilter] = useState('');
+  const [profile, setProfile] = useState({ company_name: '', email: '', remaining_days: 0 });
+  const [profileForm, setProfileForm] = useState({ company_name: '', new_password: '' });
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [profileMessage, setProfileMessage] = useState(null);
+
+  useEffect(() => {
+    if (activeTab === 'settings') {
+      fetchProfile();
+    }
+  }, [activeTab]);
+
+  const fetchProfile = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch('http://localhost:5001/api/admin/profile', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setProfile(data);
+        setProfileForm({ company_name: data.company_name, new_password: '' });
+      }
+    } catch (error) {
+      console.error("Profil yüklenirken hata:", error);
+    }
+  };
+
+  const handleUpdateProfile = async (e) => {
+    e.preventDefault();
+    setProfileLoading(true);
+    setProfileMessage(null);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch('http://localhost:5001/api/admin/profile', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(profileForm)
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setProfileMessage({ type: 'success', text: 'Profil başarıyla güncellendi!' });
+        fetchProfile();
+        setProfileForm(prev => ({ ...prev, new_password: '' })); // Şifre alanını temizle
+      } else {
+        setProfileMessage({ type: 'error', text: data.error || 'Güncelleme başarısız.' });
+      }
+    } catch (error) {
+      setProfileMessage({ type: 'error', text: 'Bağlantı hatası.' });
+    }
+    setProfileLoading(false);
+  };
+
+  const [resizingShift, setResizingShift] = useState(null); // { message, onConfirm } // { shiftId, employeeId, employeeName, dateStr, startTime, endTime }
 
   // Çıkış yapma
   const handleLogout = () => {
@@ -212,7 +263,7 @@ const AdminDashboard = () => {
     for (let i = 0; i < 7; i++) {
       const date = new Date(currentWeekStart);
       date.setDate(date.getDate() + i);
-      const dateStr = date.toISOString().split('T')[0];
+      const dateStr = date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0');
       
       const options = { day: 'numeric', month: 'short' };
       const formattedDate = date.toLocaleDateString('tr-TR', options);
@@ -301,9 +352,10 @@ const AdminDashboard = () => {
   };
 
   const handleDeleteDept = async (id) => {
-    if (!window.confirm("Bu departmanı silmek istediğinize emin misiniz? Bağlı personeller etkilenebilir!")) return;
-
-    try {
+    setConfirmModal({
+      message: "Bu departmanı silmek istediğinize emin misiniz? Bağlı personeller de etkilenebilir!",
+      onConfirm: async () => {
+        try {
       const response = await fetch(`${API_BASE_URL}/api/admin/departments/${id}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
@@ -317,9 +369,11 @@ const AdminDashboard = () => {
       } else {
         showNotification(data.error || "Silme işlemi başarısız.", "error");
       }
-    } catch (err) {
-      showNotification("Bağlantı hatası oluştu.", "error");
-    }
+        } catch (err) {
+          showNotification("Bağlantı hatası oluştu.", "error");
+        }
+      }
+    });
   };
 
   // ==========================================
@@ -418,9 +472,10 @@ const AdminDashboard = () => {
   };
 
   const handleDeleteEmp = async (id) => {
-    if (!window.confirm("Bu personeli silmek istediğinize emin misiniz? Tüm vardiya kayıtları da silinecektir!")) return;
-
-    try {
+    setConfirmModal({
+      message: "Bu personeli silmek istediğinize emin misiniz? Tüm vardiya kayıtları da silinecektir!",
+      onConfirm: async () => {
+        try {
       const response = await fetch(`${API_BASE_URL}/api/admin/employees/${id}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
@@ -434,9 +489,11 @@ const AdminDashboard = () => {
       } else {
         showNotification(data.error || "Silme işlemi başarısız.", "error");
       }
-    } catch (err) {
-      showNotification("Bağlantı hatası oluştu.", "error");
-    }
+        } catch (err) {
+          showNotification("Bağlantı hatası oluştu.", "error");
+        }
+      }
+    });
   };
 
   // ==========================================
@@ -474,9 +531,10 @@ const AdminDashboard = () => {
   };
 
   const handleDeleteTemplate = async (id) => {
-    if (!window.confirm("Bu şablonu silmek istediğinize emin misiniz?")) return;
-
-    try {
+    setConfirmModal({
+      message: "Bu şablonu silmek istediğinize emin misiniz?",
+      onConfirm: async () => {
+        try {
       const response = await fetch(`${API_BASE_URL}/api/admin/shift-templates/${id}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
@@ -489,9 +547,11 @@ const AdminDashboard = () => {
       } else {
         showNotification(data.error || "Şablon silinemedi.", "error");
       }
-    } catch (err) {
-      showNotification("Bağlantı hatası oluştu.", "error");
-    }
+        } catch (err) {
+          showNotification("Bağlantı hatası oluştu.", "error");
+        }
+      }
+    });
   };
 
   const handleUpdateTemplate = async (e) => {
@@ -523,19 +583,26 @@ const AdminDashboard = () => {
   // API Vardiya Atama Ortak Metodu
   const assignShiftAPI = async (employeeId, dateStr, startTime, endTime) => {
     // Gece vardiyası tarih hesabı
-    let endDate = new Date(dateStr);
     const [startHour, startMin] = startTime.split(':');
     const [endHour, endMin] = endTime.split(':');
 
     const startDateTimeStr = `${dateStr} ${startTime}:00`;
+    
+    let [y, m, d] = dateStr.split('-').map(Number);
+    let endDateObj = new Date(y, m - 1, d);
 
     if (
       parseInt(endHour) < parseInt(startHour) || 
       (parseInt(endHour) === parseInt(startHour) && parseInt(endMin) < parseInt(startMin))
     ) {
-      endDate.setDate(endDate.getDate() + 1);
+      endDateObj.setDate(endDateObj.getDate() + 1);
     }
-    const endDateStr = endDate.toISOString().split('T')[0];
+    
+    const endY = endDateObj.getFullYear();
+    const endM = String(endDateObj.getMonth() + 1).padStart(2, '0');
+    const endD = String(endDateObj.getDate()).padStart(2, '0');
+    const endDateStr = `${endY}-${endM}-${endD}`;
+    
     const endDateTimeStr = `${endDateStr} ${endTime}:00`;
 
     try {
@@ -637,7 +704,311 @@ const AdminDashboard = () => {
     assignShiftAPI(employeeId, dateStr, slot.start, slot.end);
   };
 
-  // Belirli Hücreye ait Atanmış Vardiyaları Getir
+
+  // Zaman Çizelgesi Modeli İşlevleri
+  const getShiftsStartingInHour = (dateStr, slot) => {
+    return shifts.filter(s => {
+      const sStart = formatTime(s.start_time);
+      const sEnd = formatTime(s.end_time);
+      const startDateStr = formatDatePart(s.start_time);
+      const sHour = sStart.split(':')[0];
+      const slotHour = slot.start.split(':')[0];
+      
+      // Durum 1: Vardiya bu tarihte ve saatte başlıyor
+      if (startDateStr === dateStr && sHour === slotHour) {
+        return true;
+      }
+      
+      // Durum 2: Önceki gün başlayıp gece yarısını geçen vardiya (Ertesi günün 00:00 slotunda çizilir)
+      if (slotHour === '00' && startDateStr !== dateStr) {
+        let startDt = new Date(`${startDateStr}T00:00:00Z`);
+        startDt.setUTCDate(startDt.getUTCDate() + 1);
+        const nextDayStr = startDt.toISOString().split('T')[0];
+        
+        if (nextDayStr === dateStr) {
+           const startParts = sStart.split(':').map(Number);
+           const endParts = sEnd.split(':').map(Number);
+           let startMins = startParts[0] * 60 + startParts[1];
+           let endMins = endParts[0] * 60 + endParts[1];
+           if (endMins <= startMins && endMins !== 0) {
+              return true; // Geceyi geçmiş
+           }
+        }
+      }
+      return false;
+    });
+  };
+
+  const calculateDayOverlaps = (shiftsForDay) => {
+    if (!shiftsForDay || shiftsForDay.length === 0) return {};
+    
+    const parseTime = (timeStr) => {
+      const parts = timeStr.split(':').map(Number);
+      return parts[0] * 60 + parts[1];
+    };
+    
+    const parsedShifts = shiftsForDay.map(s => {
+      const startStr = s.start_time.includes(' ') ? s.start_time.split(' ')[1] : s.start_time;
+      const endStr = s.end_time.includes(' ') ? s.end_time.split(' ')[1] : s.end_time;
+      let startMins = parseTime(startStr);
+      let endMins = parseTime(endStr);
+      if (endMins <= startMins) endMins += 24 * 60; // cross midnight
+      return { ...s, startMins, endMins };
+    }).sort((a, b) => a.startMins - b.startMins || a.endMins - b.endMins);
+
+    const placements = {};
+    let currentCluster = [];
+    let clusterEnd = 0;
+
+    const processCluster = (cluster) => {
+      const columns = [];
+      cluster.forEach(shift => {
+        let placed = false;
+        for (let i = 0; i < columns.length; i++) {
+          const col = columns[i];
+          const lastShiftInCol = col[col.length - 1];
+          // Allow edges to touch without triggering an overlap (<= instead of <)
+          if (lastShiftInCol.endMins <= shift.startMins) {
+            col.push(shift);
+            placements[shift.id] = { index: i };
+            placed = true;
+            break;
+          }
+        }
+        if (!placed) {
+          columns.push([shift]);
+          placements[shift.id] = { index: columns.length - 1 };
+        }
+      });
+      const count = columns.length;
+      cluster.forEach(shift => {
+        placements[shift.id].count = count;
+      });
+    };
+
+    parsedShifts.forEach(shift => {
+      if (currentCluster.length === 0) {
+        currentCluster.push(shift);
+        clusterEnd = shift.endMins;
+      } else {
+        if (shift.startMins < clusterEnd) {
+          currentCluster.push(shift);
+          if (shift.endMins > clusterEnd) {
+            clusterEnd = shift.endMins;
+          }
+        } else {
+          processCluster(currentCluster);
+          currentCluster = [shift];
+          clusterEnd = shift.endMins;
+        }
+      }
+    });
+
+    if (currentCluster.length > 0) {
+      processCluster(currentCluster);
+    }
+    return placements;
+  };
+
+  const getShiftBlockStyle = (shift, overlappingCount, index, currentDayStr) => {
+    const startDateStr = formatDatePart(shift.start_time);
+    const isContinuation = startDateStr !== currentDayStr;
+    
+    const sStart = formatTime(shift.start_time);
+    const sEnd = formatTime(shift.end_time);
+    
+    const startParts = sStart.split(':').map(Number);
+    const endParts = sEnd.split(':').map(Number);
+    
+    let startMins = startParts[0] * 60 + startParts[1];
+    let endMins = endParts[0] * 60 + endParts[1];
+    
+    if (endMins <= startMins && endMins !== 0) {
+      endMins += 24 * 60;
+    }
+    
+    const pixelsPerMinute = 0.6; // 1 saat = 36px => 1dk = 0.6px
+    let topOffset = 0;
+    let height = 0;
+    
+    if (!isContinuation) {
+      topOffset = startParts[1] * pixelsPerMinute;
+      let durationMins = endMins - startMins;
+      let maxVisibleMins = (24 * 60) - startMins;
+      let visibleDurationMins = Math.min(durationMins, maxVisibleMins);
+      height = visibleDurationMins * pixelsPerMinute;
+      
+      if (resizingShift && resizingShift.id === shift.id) {
+         if (resizingShift.direction === 'top') {
+            let diff = resizingShift.currentHeight - resizingShift.initialHeight;
+            topOffset = topOffset - diff;
+            // Prevent going above 00:00 (which is topOffset 0 relative to day start, actually in absolute it's startMins)
+            if (topOffset < -startMins * pixelsPerMinute) {
+               topOffset = -startMins * pixelsPerMinute;
+            }
+            height = resizingShift.currentHeight;
+         } else {
+            let currentDuration = Math.max(15, Math.round(resizingShift.currentHeight / pixelsPerMinute));
+            height = Math.min(currentDuration, maxVisibleMins) * pixelsPerMinute;
+         }
+      }
+    } else {
+      topOffset = 0; // 00:00 slotundan başlar
+      let remainingMins = endMins - (24 * 60);
+      height = remainingMins * pixelsPerMinute;
+      
+      if (resizingShift && resizingShift.id === shift.id) {
+         if (resizingShift.direction === 'bottom') {
+            let currentDuration = Math.max(15, Math.round(resizingShift.currentHeight / pixelsPerMinute));
+            let newEndMins = startMins + currentDuration;
+            if (newEndMins > 24 * 60) {
+                height = (newEndMins - 24 * 60) * pixelsPerMinute;
+            } else {
+                height = 0; // Artık ertesi güne sarkmıyor
+            }
+         }
+      }
+    }
+    
+    const hue = (shift.employee_id * 137.5) % 360;
+    const backgroundColor = `hsl(${hue}, 75%, 92%)`;
+    const borderColor = `hsl(${hue}, 70%, 65%)`;
+    
+    const widthPercent = 100 / (overlappingCount || 1);
+    const leftPercent = index * widthPercent;
+    
+    return {
+      top: `${topOffset}px`,
+      height: `${height}px`,
+      width: overlappingCount > 1 ? `calc(${widthPercent}% - 4px)` : '100%',
+      left: overlappingCount > 1 ? `calc(${leftPercent}% + 2px)` : '0%',
+      backgroundColor,
+      borderLeftColor: borderColor,
+      opacity: isContinuation ? 0.85 : 1 // Sarkan kısım biraz daha saydam
+    };
+  };
+
+    const handleContextMenu = (e, shift) => {
+    e.preventDefault();
+    setContextMenu({
+      visible: true,
+      x: e.clientX,
+      y: e.clientY,
+      shift: shift
+    });
+  };
+
+  // Tıklamayla menüyü kapat
+  useEffect(() => {
+    const handleClick = () => setContextMenu(null);
+    window.addEventListener('click', handleClick);
+    return () => window.removeEventListener('click', handleClick);
+  }, []);
+
+  const handleResizeStart = (e, shift, currentDayStr, direction = 'bottom') => {
+    e.stopPropagation();
+    setResizingShift({
+      id: shift.id,
+      startY: e.clientY,
+      initialHeight: parseInt(getShiftBlockStyle(shift, 1, 0, currentDayStr).height),
+      currentHeight: parseInt(getShiftBlockStyle(shift, 1, 0, currentDayStr).height),
+      pixelsPerMinute: 0.6,
+      direction: direction
+    });
+  };
+
+  useEffect(() => {
+    const handleMouseMove = (e) => {
+      if (!resizingShift) return;
+      const deltaY = e.clientY - resizingShift.startY;
+      let newHeight;
+      if (resizingShift.direction === 'bottom') {
+         newHeight = Math.max(30, resizingShift.initialHeight + deltaY); // Min 15 dk
+      } else {
+         newHeight = Math.max(30, resizingShift.initialHeight - deltaY);
+      }
+      setResizingShift(prev => ({ ...prev, currentHeight: newHeight }));
+    };
+
+    const handleMouseUp = async () => {
+      if (!resizingShift) return;
+      const shift = shifts.find(s => s.id === resizingShift.id);
+      if (shift) {
+         const newDurationMins = Math.round(resizingShift.currentHeight / resizingShift.pixelsPerMinute);
+         
+         const sStart = formatTime(shift.start_time);
+         const startParts = sStart.split(':').map(Number);
+         let startMins = startParts[0] * 60 + startParts[1];
+         
+         const sEnd = formatTime(shift.end_time);
+         const endParts = sEnd.split(':').map(Number);
+         let endMins = endParts[0] * 60 + endParts[1];
+         if (endMins <= startMins) endMins += 24 * 60; // handle cross midnight
+         
+         let newStartDatetimeStr = shift.start_time;
+         let newEndDatetimeStr = shift.end_time;
+         
+         const startDatePart = shift.start_time.split(/[ T]/)[0];
+         
+         if (resizingShift.direction === 'bottom') {
+             let newEndMins = startMins + newDurationMins;
+             let newDateStr = startDatePart;
+             
+             if (newEndMins >= 24 * 60) {
+                 newEndMins -= 24 * 60;
+                 let targetDate = new Date(`${startDatePart}T00:00:00Z`);
+                 targetDate.setUTCDate(targetDate.getUTCDate() + 1);
+                 newDateStr = targetDate.toISOString().split('T')[0];
+             }
+             const newEndHour = String(Math.floor(newEndMins / 60)).padStart(2, '0');
+             const newEndMin = String(newEndMins % 60).padStart(2, '0');
+             newEndDatetimeStr = `${newDateStr} ${newEndHour}:${newEndMin}:00`;
+         } else {
+             // Resizing from top
+             let newStartMins = endMins - newDurationMins;
+             if (newStartMins < 0) newStartMins = 0; // limit at 00:00 today
+             
+             const newStartHour = String(Math.floor(newStartMins / 60)).padStart(2, '0');
+             const newStartMin = String(newStartMins % 60).padStart(2, '0');
+             newStartDatetimeStr = `${startDatePart} ${newStartHour}:${newStartMin}:00`;
+         }
+         
+         try {
+            const response = await fetch(`${API_BASE_URL}/api/admin/shifts/${shift.id}`, {
+              method: 'PUT',
+              headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ 
+                start_datetime: newStartDatetimeStr, 
+                end_datetime: newEndDatetimeStr 
+              })
+            });
+            if (response.ok) {
+               showNotification("Vardiya süresi güncellendi.");
+               fetchShifts(); 
+               fetchLogs();
+            } else {
+               const errData = await response.json();
+               showNotification(errData.error || "Süre güncellenemedi.", "error");
+            }
+         } catch (e) {
+            showNotification("Bağlantı hatası.", "error");
+         }
+      }
+      setResizingShift(null);
+    };
+
+    if (resizingShift) {
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+    }
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [resizingShift, shifts, token]);
+
+  // Belirli Hücreye ait Atanmış Vardiyaları Getir (ESKİ)
+
   const getShiftsForCell = (dateStr, slot) => {
     return shifts.filter(s => {
       const sDate = formatDatePart(s.start_time);
@@ -665,6 +1036,8 @@ const AdminDashboard = () => {
   };
 
   // Metrikler
+  const _today = new Date();
+  const todayStr = _today.getFullYear() + '-' + String(_today.getMonth() + 1).padStart(2, '0') + '-' + String(_today.getDate()).padStart(2, '0');
   const totalDepts = departments.length;
   const totalEmps = employees.length;
   const activeEmps = employees.filter(e => e.is_active).length;
@@ -677,21 +1050,21 @@ const AdminDashboard = () => {
     <div className="overview-tab">
       <section className="metrics-grid">
         <div className="metric-card">
-          <span className="metric-icon">🏢</span>
+          <Building2 size={24} className="metric-icon" />
           <div className="metric-info">
             <h3>Departman Sayısı</h3>
             <p className="metric-number">{totalDepts}</p>
           </div>
         </div>
         <div className="metric-card success">
-          <span className="metric-icon">👥</span>
+          <Users size={24} className="metric-icon" />
           <div className="metric-info">
             <h3>Kayıtlı Çalışan (Aktif)</h3>
             <p className="metric-number">{totalEmps} ({activeEmps})</p>
           </div>
         </div>
         <div className="metric-card warning">
-          <span className="metric-icon">📅</span>
+          <Calendar size={24} className="metric-icon" />
           <div className="metric-info">
             <h3>Bugünkü Aktif Vardiyalar</h3>
             <p className="metric-number">{activeShiftsToday.length}</p>
@@ -701,31 +1074,49 @@ const AdminDashboard = () => {
 
       <div className="overview-summary-grid">
         <div className="summary-card expiring-card">
-          <h3>📅 Bugün Çalışan Personel Listesi ({todayStr})</h3>
+          <div className="summary-card-header-modern">
+            <div className="icon-wrapper">
+              <Calendar size={18} className="text-blue-500" />
+            </div>
+            <h3>Bugün Çalışan Personeller <span className="date-badge">{todayStr}</span></h3>
+          </div>
+          
           {activeShiftsToday.length > 0 ? (
-            <div className="expiring-list">
+            <div className="today-shifts-modern-list">
               {activeShiftsToday.map(s => (
-                <div key={s.id} className="expiring-item">
-                  <span className="exp-name">👤 {s.employee_name}</span>
-                  <span className="exp-badge">
-                    ⏱️ {formatTime(s.start_time)} - {formatTime(s.end_time)}
-                  </span>
+                <div key={s.id} className="modern-shift-item">
+                  <div className="shift-emp-info">
+                    <div className="emp-avatar-small">
+                      {s.employee_name.charAt(0).toUpperCase()}
+                    </div>
+                    <span className="emp-name">{s.employee_name}</span>
+                  </div>
+                  <div className="shift-time-badge">
+                    <Clock size={14} className="time-icon" />
+                    {formatTime(s.start_time)} - {formatTime(s.end_time)}
+                  </div>
                 </div>
               ))}
             </div>
           ) : (
-            <p className="no-expiring">Bugün için atanmış aktif vardiya bulunmamaktadır.</p>
+            <div className="empty-shifts-state">
+              <div className="empty-icon-circle">
+                <Inbox size={24} />
+              </div>
+              <p>Bugün için atanmış aktif vardiya bulunmamaktadır.</p>
+              <span className="empty-hint">Haftalık planlama sekmesinden yeni vardiyalar oluşturabilirsiniz.</span>
+            </div>
           )}
         </div>
 
         <div className="summary-card stats-summary-card">
-          <h3>⚡ Hızlı Planlama Aksiyonları</h3>
+          <h3>Hızlı Planlama Aksiyonları</h3>
           <div className="quick-actions-list">
             <button onClick={() => setActiveTab('shifts')} className="quick-action-btn primary-action">
-              📅 Sürükle-Bırak Vardiya Planlama
+              Sürükle-Bırak Vardiya Planlama
             </button>
             <button onClick={() => setActiveTab('employees')} className="quick-action-btn secondary-action">
-              👥 Yeni Çalışan Ekle
+              Yeni Çalışan Ekle
             </button>
           </div>
         </div>
@@ -763,7 +1154,7 @@ const AdminDashboard = () => {
             <span className="list-count">{totalDepts} Tanımlı</span>
           </div>
           <div className="list-filter-bar">
-            <span className="filter-icon">🔍</span>
+            <span className="filter-icon"><Search size={16} /></span>
             <input
               type="text"
               className="list-filter-input"
@@ -772,7 +1163,7 @@ const AdminDashboard = () => {
               onChange={e => setDeptFilter(e.target.value)}
             />
             {deptFilter && (
-              <button className="filter-clear-btn" onClick={() => setDeptFilter('')}>✕</button>
+              <button className="filter-clear-btn" onClick={() => setDeptFilter('')}><X size={14} /></button>
             )}
           </div>
           <div className="companies-table-container">
@@ -788,20 +1179,7 @@ const AdminDashboard = () => {
                   departments.filter(d => d.name.toLowerCase().includes(deptFilter.toLowerCase())).map(d => (
                     <tr key={d.id}>
                       <td>
-                        {editingDept?.id === d.id ? (
-                          <form onSubmit={handleUpdateDept} className="inline-edit-form">
-                            <input 
-                              type="text" 
-                              value={editingDept.name} 
-                              onChange={(e) => setEditingDept({ ...editingDept, name: e.target.value })}
-                              required
-                            />
-                            <button type="submit" className="action-btn-small activate">Kaydet</button>
-                            <button type="button" onClick={() => setEditingDept(null)} className="action-btn-small freeze">Vazgeç</button>
-                          </form>
-                        ) : (
-                          <span className="comp-title">{d.name}</span>
-                        )}
+                        <span className="comp-title">{d.name}</span>
                       </td>
                       <td>
                         <div className="row-actions-group">
@@ -809,7 +1187,7 @@ const AdminDashboard = () => {
                             onClick={() => setEditingDept({ id: d.id, name: d.name })} 
                             className="action-btn-small edit-btn"
                           >
-                            ✏️ Düzenle
+                            Düzenle
                           </button>
                           <button 
                             onClick={() => handleDeleteDept(d.id)} 
@@ -896,7 +1274,7 @@ const AdminDashboard = () => {
             <span className="list-count">{totalEmps} Kayıtlı</span>
           </div>
           <div className="list-filter-bar">
-            <span className="filter-icon">🔍</span>
+            <span className="filter-icon"><Search size={16} /></span>
             <input
               type="text"
               className="list-filter-input"
@@ -905,7 +1283,7 @@ const AdminDashboard = () => {
               onChange={e => setEmpFilter(e.target.value)}
             />
             {empFilter && (
-              <button className="filter-clear-btn" onClick={() => setEmpFilter('')}>✕</button>
+              <button className="filter-clear-btn" onClick={() => setEmpFilter('')}><X size={14} /></button>
             )}
             <select
               className="list-filter-select"
@@ -973,7 +1351,7 @@ const AdminDashboard = () => {
                             onClick={() => setEditingEmp({ ...emp })} 
                             className="action-btn-small edit-btn"
                           >
-                            ✏️ Düzenle
+                            Düzenle
                           </button>
                           <button 
                             onClick={() => handleDeleteEmp(emp.id)} 
@@ -999,8 +1377,122 @@ const AdminDashboard = () => {
   );
 
   // Sekme 4: Sürükle Bırak Vardiya Planlama (Drag & Drop Planner)
+
+  const handleExportExcel = async () => {
+    try {
+      const workbook = new ExcelJS.Workbook();
+      const sheet = workbook.addWorksheet('Haftalık Vardiya', {
+        views: [{ showGridLines: false }]
+      });
+
+      sheet.columns = [
+        { header: '', key: 'emp', width: 25 },
+        { header: '', key: 'dept', width: 20 },
+        { header: '', key: 'mon', width: 18 },
+        { header: '', key: 'tue', width: 18 },
+        { header: '', key: 'wed', width: 18 },
+        { header: '', key: 'thu', width: 18 },
+        { header: '', key: 'fri', width: 18 },
+        { header: '', key: 'sat', width: 18 },
+        { header: '', key: 'sun', width: 18 }
+      ];
+
+      const companyName = profile.company_name || 'Vardiya Planı';
+      const weekStr = `${new Date(currentWeekStart).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })} Haftası`;
+
+      sheet.mergeCells('A1:I2');
+      const titleCell = sheet.getCell('A1');
+      titleCell.value = `${companyName} - ${weekStr}`;
+      titleCell.font = { name: 'Arial', size: 16, bold: true, color: { argb: 'FFFFFFFF' } };
+      titleCell.alignment = { vertical: 'middle', horizontal: 'center' };
+      titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E293B' } };
+
+      sheet.addRow([]);
+
+      const headerRow = sheet.addRow(['Personel Adı', 'Departman', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi', 'Pazar']);
+      headerRow.height = 25;
+      headerRow.eachCell((cell) => {
+        cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+        cell.alignment = { vertical: 'middle', horizontal: 'center' };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF3B82F6' } };
+        cell.border = {
+          top: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+          left: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+          bottom: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+          right: { style: 'thin', color: { argb: 'FFCBD5E1' } }
+        };
+      });
+
+      const activeEmployees = employees.filter(e => e.is_active);
+      const days = getDaysOfWeek();
+
+      activeEmployees.forEach((emp, index) => {
+        const empShifts = shifts.filter(s => s.employee_id === emp.id);
+        const rowData = [
+          `${emp.first_name} ${emp.last_name}`,
+          emp.department_name || 'Belirtilmedi'
+        ];
+
+        days.forEach(day => {
+          const dayShifts = empShifts.filter(s => s.start_time.startsWith(day.dateStr));
+          if (dayShifts.length > 0) {
+            const shiftTexts = dayShifts.map(s => {
+              const start = s.start_time.substring(11, 16);
+              const end = s.end_time.substring(11, 16);
+              return `${start} - ${end}`;
+            }).join('\n');
+            rowData.push(shiftTexts);
+          } else {
+            rowData.push('İzinli');
+          }
+        });
+
+        const row = sheet.addRow(rowData);
+        row.height = 30;
+        const bgColor = index % 2 === 0 ? 'FFF8FAFC' : 'FFFFFFFF';
+
+        row.eachCell((cell, colNum) => {
+          cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bgColor } };
+          cell.border = {
+            top: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+            left: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+            bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+            right: { style: 'thin', color: { argb: 'FFE2E8F0' } }
+          };
+          
+          if (colNum <= 2) {
+             cell.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
+             cell.font = { bold: true, color: { argb: 'FF334155' } };
+          } else {
+             if (cell.value === 'İzinli') {
+                 cell.font = { italic: true, color: { argb: 'FF94A3B8' } };
+             } else {
+                 cell.font = { color: { argb: 'FF0F172A' }, bold: true };
+                 cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEFF6FF' } }; 
+             }
+          }
+        });
+      });
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      saveAs(blob, `Vardiya_Plani_${weekStr.replace(/\s+/g, '_')}.xlsx`);
+    } catch (err) {
+      console.error("Excel dışa aktarılırken hata:", err);
+      alert("Excel dosyası oluşturulurken bir hata oluştu.");
+    }
+  };
+
   const renderShifts = () => {
     const daysOfWeek = getDaysOfWeek();
+    
+    const allOverlaps = {};
+    daysOfWeek.forEach(day => {
+       const dayShifts = shifts.filter(s => formatDatePart(s.start_time) === day.dateStr);
+       const dayOverlaps = calculateDayOverlaps(dayShifts);
+       Object.assign(allOverlaps, dayOverlaps);
+    });
 
     return (
       <div className="planner-tab-layout">
@@ -1008,11 +1500,30 @@ const AdminDashboard = () => {
         {/* Sol Kenar: Sürüklenebilir Çalışanlar Listesi */}
         <aside className="employees-drag-source">
           <div className="drag-source-header">
-            <h3>👥 Çalışan Kadrosu</h3>
+            <h3>Çalışan Kadrosu</h3>
             <p>Vardiya atamak için personeli takvime sürükleyin.</p>
+            <div className="planner-emp-filter-container">
+              <Search size={14} className="filter-icon" />
+              <input 
+                type="text" 
+                placeholder="İsim veya departman ara..." 
+                value={plannerEmpFilter}
+                onChange={(e) => setPlannerEmpFilter(e.target.value)}
+                className="planner-emp-filter-input"
+              />
+            </div>
           </div>
           <div className="draggable-employees-list">
-            {employees.filter(e => e.is_active).map(emp => (
+            {employees
+              .filter(e => e.is_active)
+              .filter(e => {
+                if (!plannerEmpFilter) return true;
+                const searchStr = plannerEmpFilter.toLowerCase();
+                const fullName = `${e.first_name} ${e.last_name}`.toLowerCase();
+                const dept = (e.department_name || '').toLowerCase();
+                return fullName.includes(searchStr) || dept.includes(searchStr);
+              })
+              .map(emp => (
               <div 
                 key={emp.id}
                 draggable="true"
@@ -1020,12 +1531,12 @@ const AdminDashboard = () => {
                 className="draggable-employee-card"
                 title="Sürüklemek için fareyle tutup takvime bırakın"
               >
-                <span className="card-avatar">👤</span>
+                <div className="card-avatar"><User size={16} /></div>
                 <div className="card-info">
                   <span className="card-name">{emp.first_name} {emp.last_name}</span>
                   <span className="card-dept">{emp.department_name || 'Departmansız'}</span>
                 </div>
-                <span className="drag-handle-dots">⋮⋮</span>
+                <span className="drag-handle-dots"><GripVertical size={16} /></span>
               </div>
             ))}
             {employees.filter(e => e.is_active).length === 0 && (
@@ -1041,9 +1552,26 @@ const AdminDashboard = () => {
               <button onClick={handlePrevWeek} className="nav-week-btn">◀ Önceki Hafta</button>
               <button onClick={handleCurrentWeek} className="nav-week-btn secondary">Bugün</button>
               <button onClick={handleNextWeek} className="nav-week-btn">Sonraki Hafta ▶</button>
+              <button 
+                onClick={() => setShowNightHours(!showNightHours)} 
+                className={`nav-week-btn ${showNightHours ? 'secondary' : ''}`}
+                style={{ marginLeft: '1rem', display: 'flex', alignItems: 'center', gap: '0.4rem', background: showNightHours ? 'var(--bg-dark-soft)' : '#f1f5f9' }}
+              >
+                {showNightHours ? <Sun size={14} /> : <Moon size={14} />}
+                {showNightHours ? 'Geceyi Gizle' : 'Geceyi Göster'}
+              </button>
+
+              <button 
+                onClick={handleExportExcel} 
+                className="nav-week-btn excel-export-btn"
+                style={{ marginLeft: '1rem', display: 'flex', alignItems: 'center', gap: '0.4rem', background: '#10b981', color: '#fff', borderColor: '#059669' }}
+                title="Şu anki programı şık bir Excel olarak indir"
+              >
+                <Download size={14} /> Excel İndir
+              </button>
             </div>
             <div className="week-range-label">
-              📅 <strong>{new Date(currentWeekStart).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })}</strong> haftası
+              <strong>{new Date(currentWeekStart).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })}</strong> haftası
             </div>
           </header>
 
@@ -1052,12 +1580,12 @@ const AdminDashboard = () => {
               <thead>
                 <tr>
                   <th className="template-col-header">Vardiya Saatleri</th>
-                  {daysOfWeek.map(day => {
+                  {(expandedDay ? daysOfWeek.filter(d => d.dateStr === expandedDay) : daysOfWeek).map(day => {
                     const isOverHeader = dragOverCell?.dateStr === day.dateStr && dragOverCell?.templateId === 'header';
                     return (
                       <th 
                         key={day.dateStr} 
-                        className={`day-col-header ${isOverHeader ? 'drag-over-header' : ''}`}
+                        className={`day-col-header ${isOverHeader ? 'drag-over-header' : ''} ${expandedDay === day.dateStr ? 'expanded-col' : ''}`}
                         onDragOver={(e) => {
                           e.preventDefault();
                           if (dragOverCell?.dateStr !== day.dateStr || dragOverCell?.templateId !== 'header') {
@@ -1076,10 +1604,19 @@ const AdminDashboard = () => {
                             dateStr: day.dateStr
                           });
                         }}
+                      onClick={(e) => { e.stopPropagation(); setExpandedDay(expandedDay === day.dateStr ? null : day.dateStr); }}
+                      style={{ cursor: 'pointer' }}
                       >
-                        <span className="day-name-hdr">{day.dayName}</span>
-                        <span className="day-date-hdr">{day.formattedDate}</span>
-                        <div className="quick-drop-hint">Hızlı Şablon 📥</div>
+                        <div className="day-header-top-row">
+                          <div className="day-header-text">
+                            <span className="day-name-hdr">{day.dayName}</span>
+                            <span className="day-date-hdr">{day.formattedDate}</span>
+                          </div>
+                          <div className="expand-day-btn" title={expandedDay === day.dateStr ? "Daralt" : "Genişlet"}>
+                            {expandedDay === day.dateStr ? <Minimize2 size={14}/> : <Maximize2 size={14}/>}
+                          </div>
+                        </div>
+                        <div className="quick-drop-hint">Hızlı Şablon <Inbox size={14} /></div>
                       </th>
                     );
                   })}
@@ -1087,14 +1624,19 @@ const AdminDashboard = () => {
               </thead>
               <tbody>
                 {/* Her Bir 1 Saatlik Dilim İçin Satır */}
-                {hourlySlots.map(slot => (
+                {hourlySlots
+                  .filter(slot => {
+                    if (showNightHours) return true;
+                    const h = parseInt(slot.start.split(':')[0]);
+                    return h >= 8;
+                  })
+                  .map(slot => (
                   <tr key={`${slot.start}-${slot.end}`}>
                     <td className="template-cell-info">
                       <strong>{slot.start} - {slot.end}</strong>
-                      <span className="t-hours">1 Saatlik Dilim</span>
                     </td>
-                    {daysOfWeek.map(day => {
-                      const cellShifts = getShiftsForCell(day.dateStr, slot);
+                    {(expandedDay ? daysOfWeek.filter(d => d.dateStr === expandedDay) : daysOfWeek).map(day => {
+                      const cellShifts = getShiftsStartingInHour(day.dateStr, slot);
                       const slotId = `${slot.start}-${slot.end}`;
                       const isOver = dragOverCell?.dateStr === day.dateStr && dragOverCell?.templateId === slotId;
                       return (
@@ -1111,30 +1653,58 @@ const AdminDashboard = () => {
                             setDragOverCell(null);
                             handleDropEmployee(e, day.dateStr, slot);
                           }}
-                          className={`planner-drop-zone-cell ${isOver ? 'drag-over' : ''}`}
+                          className={`planner-drop-zone-cell ${isOver ? 'drag-over' : ''} ${expandedDay === day.dateStr ? 'expanded-col' : ''}`}
                         >
                           <div className="dropped-employees-container">
-                            {cellShifts.map(s => (
-                              <div key={s.id} className="dropped-employee-badge">
-                                <span className="emp-badge-text" title={s.employee_name}>👤 {s.employee_name}</span>
-                                <div className="badge-actions-group">
-                                  <button 
-                                    onClick={() => handleEditShiftClick(s)}
-                                    className="edit-shift-btn-small"
-                                    title="Vardiyayı Düzenle"
-                                  >
-                                    ✏️
-                                  </button>
-                                  <button 
-                                    onClick={() => handleDeleteShift(s.id)}
-                                    className="remove-shift-btn"
-                                    title="Vardiyayı İptal Et"
-                                  >
-                                    ✕
-                                  </button>
+                            {cellShifts.map((s, idx) => {
+                              const overlapInfo = allOverlaps[s.id] || { count: 1, index: 0 };
+                              const style = getShiftBlockStyle(s, overlapInfo.count, overlapInfo.index, day.dateStr);
+                              let displayStartTime = formatTime(s.start_time);
+                              let displayEndTime = formatTime(s.end_time);
+                              
+                              if (resizingShift?.id === s.id) {
+                                  const startParts = formatTime(s.start_time).split(':').map(Number);
+                                  let startMins = startParts[0] * 60 + startParts[1];
+                                  
+                                  const endParts = formatTime(s.end_time).split(':').map(Number);
+                                  let endMins = endParts[0] * 60 + endParts[1];
+                                  if (endMins <= startMins) endMins += 24 * 60;
+                                  
+                                  const currentDurationMins = Math.round(resizingShift.currentHeight / resizingShift.pixelsPerMinute);
+                                  
+                                  if (resizingShift.direction === 'bottom') {
+                                      let newEndMins = startMins + currentDurationMins;
+                                      if (newEndMins >= 24 * 60) newEndMins -= 24 * 60;
+                                      const h = String(Math.floor(newEndMins / 60)).padStart(2, '0');
+                                      const m = String(newEndMins % 60).padStart(2, '0');
+                                      displayEndTime = `${h}:${m}`;
+                                  } else {
+                                      let newStartMins = endMins - currentDurationMins;
+                                      if (newStartMins < 0) newStartMins = 0;
+                                      const h = String(Math.floor(newStartMins / 60)).padStart(2, '0');
+                                      const m = String(newStartMins % 60).padStart(2, '0');
+                                      displayStartTime = `${h}:${m}`;
+                                  }
+                              }
+                              
+                              return (
+                                <div 
+                                  key={s.id} 
+                                  className={`absolute-shift-block ${resizingShift?.id === s.id ? 'resizing' : ''}`}
+                                  style={style}
+                                  title={s.employee_name + " (Sağ Tıklayın)"}
+                                  onContextMenu={(e) => handleContextMenu(e, s)}
+                                >
+                                  <div className="shift-resizer shift-resizer-top" onMouseDown={(e) => handleResizeStart(e, s, day.dateStr, 'top')} />
+                                  <div className="shift-block-time">
+                                     <span className="shift-time-text">{displayStartTime} - {displayEndTime}</span>
+                                  </div>
+                                  <div className="shift-block-name">{s.employee_name}</div>
+                                  
+                                  <div className="shift-resizer shift-resizer-bottom" onMouseDown={(e) => handleResizeStart(e, s, day.dateStr, 'bottom')} />
                                 </div>
-                              </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         </td>
                       );
@@ -1154,10 +1724,10 @@ const AdminDashboard = () => {
     <section className="audit-logs-section no-margin-top">
       <div className="section-title-row">
         <h2>Şirket İşlem Geçmişi (Audit Logs)</h2>
-        <button onClick={fetchLogs} className="refresh-logs-btn">🔄 Listeyi Yenile</button>
+        <button onClick={fetchLogs} className="refresh-logs-btn"><RefreshCw size={14} className="btn-icon" /> Listeyi Yenile</button>
       </div>
       <div className="list-filter-bar">
-        <span className="filter-icon">🔍</span>
+        <span className="filter-icon"><Search size={16} /></span>
         <input
           type="text"
           className="list-filter-input"
@@ -1166,7 +1736,7 @@ const AdminDashboard = () => {
           onChange={e => setLogFilter(e.target.value)}
         />
         {logFilter && (
-          <button className="filter-clear-btn" onClick={() => setLogFilter('')}>✕</button>
+          <button className="filter-clear-btn" onClick={() => setLogFilter('')}><X size={14} /></button>
         )}
       </div>
       <div className="logs-table-container">
@@ -1198,7 +1768,7 @@ const AdminDashboard = () => {
                 })
                 .map(log => (
                 <tr key={log.id}>
-                  <td className="log-time">⏱️ {log.timestamp}</td>
+                  <td className="log-time">{log.timestamp}</td>
                   <td className="log-user">{log.user_email}</td>
                   <td className="log-action">{log.action}</td>
                   <td className="log-ip">{log.ip_address || '127.0.0.1'}</td>
@@ -1267,7 +1837,7 @@ const AdminDashboard = () => {
             <span className="list-count">{shiftTemplates.length} Adet</span>
           </div>
           <div className="list-filter-bar">
-            <span className="filter-icon">🔍</span>
+            <span className="filter-icon"><Search size={16} /></span>
             <input
               type="text"
               className="list-filter-input"
@@ -1276,7 +1846,7 @@ const AdminDashboard = () => {
               onChange={e => setTemplateFilter(e.target.value)}
             />
             {templateFilter && (
-              <button className="filter-clear-btn" onClick={() => setTemplateFilter('')}>✕</button>
+              <button className="filter-clear-btn" onClick={() => setTemplateFilter('')}><X size={14} /></button>
             )}
           </div>
           <div className="companies-table-container">
@@ -1293,10 +1863,10 @@ const AdminDashboard = () => {
                   shiftTemplates.filter(t => t.name.toLowerCase().includes(templateFilter.toLowerCase())).map(t => (
                     <tr key={t.id}>
                       <td>
-                        <span className="comp-title">⚙️ {t.name}</span>
+                        <span className="comp-title">{t.name}</span>
                       </td>
                       <td>
-                        <span className="comp-email">⏱️ {t.start_time} - {t.end_time}</span>
+                        <span className="comp-email">{t.start_time} - {t.end_time}</span>
                       </td>
                       <td>
                         <div className="row-actions-group">
@@ -1304,7 +1874,7 @@ const AdminDashboard = () => {
                             onClick={() => setEditingTemplate({ id: t.id, name: t.name, start_time: t.start_time, end_time: t.end_time })}
                             className="action-btn-small edit-btn"
                           >
-                            ✏️ Düzenle
+                            Düzenle
                           </button>
                           <button 
                             onClick={() => handleDeleteTemplate(t.id)} 
@@ -1335,7 +1905,7 @@ const AdminDashboard = () => {
       <div className="modal-content">
         <div className="modal-header">
           <h2>Вardiya Şablonunu Güncelle</h2>
-          <button onClick={() => setEditingTemplate(null)} className="close-modal-btn">✕</button>
+          <button onClick={() => setEditingTemplate(null)} className="close-modal-btn"><X size={14} /></button>
         </div>
         <form onSubmit={handleUpdateTemplate} className="modal-form">
           <div className="form-group">
@@ -1372,7 +1942,65 @@ const AdminDashboard = () => {
           </div>
           <div className="modal-actions">
             <button type="button" onClick={() => setEditingTemplate(null)} className="modal-cancel-btn">Vazgeç</button>
-            <button type="submit" className="modal-save-btn">✅ Kaydet</button>
+            <button type="submit" className="modal-save-btn">Kaydet</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+
+
+  // Silme Onay Modalı
+  const renderConfirmModal = () => (
+    <div className="modal-backdrop">
+      <div className="modal-content" style={{ maxWidth: '420px' }}>
+        <div className="modal-header">
+          <h2 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#ef4444' }}>
+            <AlertCircle size={20} /> Silme İşlemini Onayla
+          </h2>
+          <button onClick={() => setConfirmModal(null)} className="close-modal-btn"><X size={14} /></button>
+        </div>
+        <div className="modal-body" style={{ padding: '1rem 0', lineHeight: '1.5', color: 'var(--text-secondary)' }}>
+          {confirmModal.message}
+        </div>
+        <div className="modal-actions">
+          <button onClick={() => setConfirmModal(null)} className="modal-cancel-btn">Vazgeç</button>
+          <button 
+            onClick={() => {
+              confirmModal.onConfirm();
+              setConfirmModal(null);
+            }} 
+            className="modal-btn cancel"
+            style={{ background: '#ef4444', color: 'white', border: 'none', padding: '0.7rem 1.75rem', borderRadius: 'var(--radius-md)', fontWeight: '700', cursor: 'pointer', boxShadow: '0 4px 12px rgba(239, 68, 68, 0.25)' }}
+          >
+            Evet, Sil
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  // Departman Düzenleme Modalı
+  const renderEditDeptModal = () => (
+    <div className="modal-backdrop">
+      <div className="modal-content">
+        <div className="modal-header">
+          <h2>Departman Adını Güncelle</h2>
+          <button onClick={() => setEditingDept(null)} className="close-modal-btn"><X size={14} /></button>
+        </div>
+        <form onSubmit={handleUpdateDept} className="modal-form">
+          <div className="form-group">
+            <label>Departman Adı</label>
+            <input 
+              type="text" 
+              value={editingDept.name} 
+              onChange={(e) => setEditingDept({ ...editingDept, name: e.target.value })}
+              required
+            />
+          </div>
+          <div className="modal-actions">
+            <button type="button" onClick={() => setEditingDept(null)} className="modal-cancel-btn">Vazgeç</button>
+            <button type="submit" className="modal-save-btn">Kaydet</button>
           </div>
         </form>
       </div>
@@ -1385,7 +2013,7 @@ const AdminDashboard = () => {
       <div className="modal-content">
         <div className="modal-header">
           <h2>Personel Bilgilerini Güncelle</h2>
-          <button onClick={() => setEditingEmp(null)} className="close-modal-btn">✕</button>
+          <button onClick={() => setEditingEmp(null)} className="close-modal-btn"><X size={14} /></button>
         </div>
         <form onSubmit={handleUpdateEmp} className="modal-form">
           <div className="form-group">
@@ -1456,12 +2084,12 @@ const AdminDashboard = () => {
         <div className="modal-content">
           <div className="modal-header">
             <h2>Özel Saatli Vardiya Ata</h2>
-            <button onClick={() => setCustomShiftModal(null)} className="close-modal-btn">✕</button>
+            <button onClick={() => setCustomShiftModal(null)} className="close-modal-btn"><X size={14} /></button>
           </div>
           <form onSubmit={handleCustomShiftSubmit} className="modal-form">
             <div className="custom-shift-info">
-              <p>👤 <strong>Personel:</strong> {empName}</p>
-              <p>📅 <strong>Tarih:</strong> {customShiftModal.dateStr}</p>
+              <p><strong>Personel:</strong> {empName}</p>
+              <p><strong>Tarih:</strong> {customShiftModal.dateStr}</p>
             </div>
             <div className="form-grid">
               <div className="form-group">
@@ -1503,12 +2131,12 @@ const AdminDashboard = () => {
         <div className="modal-content text-left">
           <div className="modal-header">
             <h2>Hazır Vardiya Şablonu Ata</h2>
-            <button onClick={() => setTemplateAssignModal(null)} className="close-modal-btn">✕</button>
+            <button onClick={() => setTemplateAssignModal(null)} className="close-modal-btn"><X size={14} /></button>
           </div>
           <div className="modal-body-content" style={{ textAlign: 'left' }}>
             <div className="custom-shift-info" style={{ marginBottom: '1.5rem' }}>
-              <p>👤 <strong>Personel:</strong> {empName}</p>
-              <p>📅 <strong>Tarih:</strong> {templateAssignModal.dateStr}</p>
+              <p><strong>Personel:</strong> {empName}</p>
+              <p><strong>Tarih:</strong> {templateAssignModal.dateStr}</p>
             </div>
             
             <div className="templates-selector-group">
@@ -1525,7 +2153,7 @@ const AdminDashboard = () => {
                     className="assign-template-card-btn"
                   >
                     <strong>{t.name}</strong>
-                    <span>⏱️ {t.start_time} - {t.end_time}</span>
+                    <span>{t.start_time} - {t.end_time}</span>
                   </button>
                 ))}
                 {shiftTemplates.length === 0 && (
@@ -1630,12 +2258,12 @@ const AdminDashboard = () => {
         <div className="modal-content">
           <div className="modal-header">
             <h2>Vardiya Saatlerini Düzenle</h2>
-            <button onClick={() => setEditingShiftModal(null)} className="close-modal-btn">✕</button>
+            <button onClick={() => setEditingShiftModal(null)} className="close-modal-btn"><X size={14} /></button>
           </div>
           <form onSubmit={handleEditingShiftSubmit} className="modal-form">
             <div className="custom-shift-info" style={{ marginBottom: '1.5rem', textAlign: 'left' }}>
-              <p>👤 <strong>Personel:</strong> {editingShiftModal.employeeName}</p>
-              <p>📅 <strong>Tarih:</strong> {editingShiftModal.dateStr}</p>
+              <p><strong>Personel:</strong> {editingShiftModal.employeeName}</p>
+              <p><strong>Tarih:</strong> {editingShiftModal.dateStr}</p>
             </div>
             <div className="form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
               <div className="form-group">
@@ -1678,7 +2306,82 @@ const AdminDashboard = () => {
     );
   }
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  const renderSettings = () => (
+    <div className="tab-pane active fade-in">
+      
+      <div className="settings-container">
+        {/* Lisans Durumu */}
+        <div className="settings-card license-card">
+          <div className="settings-card-header">
+            <Clock size={20} className="icon-blue" />
+            <h3>Abonelik Durumu</h3>
+          </div>
+          <div className="settings-card-body">
+            <div className="license-stat">
+              <span className="stat-label">Kalan Süre:</span>
+              <span className={`stat-value ${(!profile.license_end_date || profile.remaining_days >= 7) ? 'success' : 'danger'}`}>
+                {!profile.license_end_date ? 'Limitsiz' : `${profile.remaining_days} Gün`}
+              </span>
+            </div>
+            <p className="license-note">Lisans bitiş tarihi: {profile.license_end_date ? new Date(profile.license_end_date).toLocaleDateString('tr-TR') : 'Sınırsız (Ömür Boyu)'}</p>
+          </div>
+        </div>
+
+        {/* Profil Formu */}
+        <div className="settings-card form-card">
+          <div className="settings-card-header">
+            <Building size={20} className="icon-purple" />
+            <h3>Şirket Bilgileri</h3>
+          </div>
+          <div className="settings-card-body">
+            <form onSubmit={handleUpdateProfile} className="settings-form">
+              <div className="form-group">
+                <label>Admin E-posta</label>
+                <input type="text" value={profile.email} disabled className="disabled-input" />
+                <span className="input-hint">E-posta adresi değiştirilemez.</span>
+              </div>
+              
+              <div className="form-group">
+                <label>Şirket Adı</label>
+                <input 
+                  type="text" 
+                  value={profileForm.company_name} 
+                  onChange={(e) => setProfileForm({...profileForm, company_name: e.target.value})} 
+                  required
+                />
+              </div>
+
+              <div className="form-section-title" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginTop: '2.5rem', marginBottom: '1.5rem', borderBottom: '1px solid #f1f5f9', paddingBottom: '1rem' }}>
+                <Shield size={20} className="icon-red" />
+                <h3 style={{ margin: 0, fontSize: '1.15rem', color: '#0f172a', fontWeight: '700' }}>Güvenlik</h3>
+              </div>
+              
+              <div className="form-group">
+                <label>Yeni Şifre (Değiştirmek istemiyorsanız boş bırakın)</label>
+                <input 
+                  type="password" 
+                  placeholder="******" 
+                  value={profileForm.new_password}
+                  onChange={(e) => setProfileForm({...profileForm, new_password: e.target.value})}
+                  minLength={6}
+                />
+              </div>
+
+              {profileMessage && (
+                <div className={`form-alert ${profileMessage.type}`}>
+                  {profileMessage.text}
+                </div>
+              )}
+
+              <button type="submit" className="save-settings-btn" disabled={profileLoading}>
+                {profileLoading ? 'Kaydediliyor...' : 'Değişiklikleri Kaydet'}
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 
   if (activeTab === 'shifts') {
     return (
@@ -1695,7 +2398,7 @@ const AdminDashboard = () => {
             </div>
           </div>
           <div className="fs-header-right">
-            <span className="user-avatar">👤</span>
+            <div className="user-avatar"><User size={20} /></div>
             <div className="user-details">
               <span className="user-email">{localStorage.getItem('email') || 'yonetici@sirket.com'}</span>
               <span className="user-role-label">Şirket Yöneticisi</span>
@@ -1706,7 +2409,21 @@ const AdminDashboard = () => {
         <div className="planner-fs-content">
           {message && (
             <div className={`dashboard-alert ${messageType}`}>
-              {messageType === 'success' ? '✅' : '❌'} {message}
+              {messageType === 'success' ? '' : ''} {message}
+            </div>
+          )}
+                    {contextMenu && contextMenu.visible && (
+            <div 
+              className="shift-context-menu" 
+              style={{ top: contextMenu.y, left: contextMenu.x }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button onClick={() => { handleEditShiftClick(contextMenu.shift); setContextMenu(null); }}>
+                <Edit size={14} /> Düzenle
+              </button>
+              <button className="danger" onClick={() => { handleDeleteShift(contextMenu.shift.id); setContextMenu(null); }}>
+                <X size={14} /> Kaldır
+              </button>
             </div>
           )}
           {renderShifts()}
@@ -1731,7 +2448,7 @@ const AdminDashboard = () => {
       {/* Sol Sidebar */}
       <aside className="sidebar">
         <div className="sidebar-brand">
-          <span className="logo-icon">⚡</span>
+          <span className="logo-icon"><Zap size={24} color="#7c3aed" /></span>
           <div className="brand-meta">
             <span className="logo-text">Shift<span className="accent">App</span></span>
             <span className="sidebar-role">Şirket Yetkilisi</span>
@@ -1743,43 +2460,49 @@ const AdminDashboard = () => {
             onClick={() => setActiveTab('overview')} 
             className={`sidebar-item ${activeTab === 'overview' ? 'active' : ''}`}
           >
-            📊 Genel Bakış
+            <LayoutDashboard size={18} className="sidebar-icon" /> Genel Bakış
           </button>
           <button 
             onClick={() => setActiveTab('departments')} 
             className={`sidebar-item ${activeTab === 'departments' ? 'active' : ''}`}
           >
-            🏢 Departmanlar
+            <Building2 size={18} className="sidebar-icon" /> Departmanlar
           </button>
           <button 
             onClick={() => setActiveTab('employees')} 
             className={`sidebar-item ${activeTab === 'employees' ? 'active' : ''}`}
           >
-            👥 Personel Yönetimi
+            <Users size={18} className="sidebar-icon" /> Personel Yönetimi
           </button>
           <button 
             onClick={() => setActiveTab('shifts')} 
             className={`sidebar-item ${activeTab === 'shifts' ? 'active' : ''}`}
           >
-            📅 Vardiya Planlama
+            <Calendar size={18} className="sidebar-icon" /> Vardiya Planlama
           </button>
           <button 
             onClick={() => setActiveTab('templates')} 
             className={`sidebar-item ${activeTab === 'templates' ? 'active' : ''}`}
           >
-            ⚙️ Hazır Vardiyalar
+            <Settings size={18} className="sidebar-icon" /> Hazır Vardiyalar
           </button>
           <button 
             onClick={() => setActiveTab('logs')} 
             className={`sidebar-item ${activeTab === 'logs' ? 'active' : ''}`}
           >
-            ⏱️ İşlem Logları
+            <Activity size={18} className="sidebar-icon" /> İşlem Logları
+          </button>
+          <button 
+            onClick={() => setActiveTab('settings')} 
+            className={`sidebar-item ${activeTab === 'settings' ? 'active' : ''}`}
+          >
+            <Settings size={18} className="sidebar-icon" /> Ayarlar
           </button>
         </nav>
 
         <div className="sidebar-footer">
           <button onClick={handleLogout} className="logout-sidebar-btn">
-            ↪ Güvenli Çıkış
+            <LogOut size={18} className="sidebar-icon" /> Güvenli Çıkış
           </button>
         </div>
       </aside>
@@ -1794,12 +2517,21 @@ const AdminDashboard = () => {
               activeTab === 'employees' ? 'Personel Kadrosu' :
               activeTab === 'shifts' ? 'Haftalık Vardiya Planı' :
               activeTab === 'templates' ? 'Hazır Vardiya Şablonları' :
+              activeTab === 'settings' ? 'Ayarlar ve Şirket Profili' :
               'Şirket İşlem Geçmişi (Audit Logs)'
             }</h1>
-            <p>Çalışanlarınızı, departman çalışma alanlarını ve günlük vardiyalarınızı planlayın.</p>
+            <p>{
+              activeTab === 'overview' ? 'Şirketinizin genel durumunu ve lisans bilgilerinizi görüntüleyin.' :
+              activeTab === 'departments' ? 'Departmanları ve görev alanlarını yönetin.' :
+              activeTab === 'employees' ? 'Personel kadronuzu yönetin ve izin durumlarını takip edin.' :
+              activeTab === 'shifts' ? 'Sürükle bırak ile kolayca haftalık vardiyaları planlayın.' :
+              activeTab === 'templates' ? 'Sık kullandığınız vardiya şablonlarını yönetin.' :
+              activeTab === 'settings' ? 'Şirket profilinizi ve güvenlik ayarlarınızı yapılandırın.' :
+              'Sistemdeki son işlemleri ve kullanıcı etkinliklerini inceleyin.'
+            }</p>
           </div>
           <div className="user-profile-badge">
-            <span className="user-avatar">👤</span>
+            <div className="user-avatar"><User size={20} /></div>
             <div className="user-details">
               <span className="user-email">{localStorage.getItem('email') || 'yonetici@sirket.com'}</span>
               <span className="user-role-label">Şirket Yöneticisi</span>
@@ -1810,7 +2542,7 @@ const AdminDashboard = () => {
         <div className="content-container">
           {message && (
             <div className={`dashboard-alert ${messageType}`}>
-              {messageType === 'success' ? '✅' : '❌'} {message}
+              {messageType === 'success' ? '' : ''} {message}
             </div>
           )}
 
@@ -1820,8 +2552,15 @@ const AdminDashboard = () => {
           {activeTab === 'shifts' && renderShifts()}
           {activeTab === 'templates' && renderTemplates()}
           {activeTab === 'logs' && renderAuditLogs()}
+          {activeTab === 'settings' && renderSettings()}
         </div>
       </div>
+
+      {/* Silme Onay Modalı */}
+      {confirmModal && renderConfirmModal()}
+
+      {/* Departman Düzenleme Modalı */}
+      {editingDept && renderEditDeptModal()}
 
       {/* Personel Düzenleme Modalı */}
       {editingEmp && renderEditEmpModal()}

@@ -1,4 +1,5 @@
 import React from 'react';
+import { Zap } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import './Footer.css';
 
@@ -9,7 +10,7 @@ const Footer = () => {
       <div className="footer-container">
         <div className="footer-brand">
           <Link to="/" className="footer-logo">
-            <span className="logo-icon">⚡</span>
+            <span className="logo-icon"><Zap size={24} color="#7c3aed" /></span>
             <span className="logo-text">Shift<span className="accent">App</span></span>
           </Link>
           <p className="footer-description">

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../config';
+import { LayoutDashboard, Building2, Users, Calendar, Settings, Activity, LogOut, User, RefreshCw, AlertCircle, Zap, Shield, Search, X, Crown, CheckCircle2 } from 'lucide-react';
 import './SuperAdminDashboard.css';
 
 const SuperAdminDashboard = () => {
@@ -305,21 +306,21 @@ const SuperAdminDashboard = () => {
     <div className="overview-tab">
       <section className="metrics-grid">
         <div className="metric-card">
-          <span className="metric-icon">🏢</span>
+          <Building2 size={24} className="metric-icon" />
           <div className="metric-info">
             <h3>Kayıtlı Şirket Sayısı</h3>
             <p className="metric-number">{totalCompanies}</p>
           </div>
         </div>
         <div className="metric-card success">
-          <span className="metric-icon">🟢</span>
+          <span className="metric-icon"><CheckCircle2 size={24} /></span>
           <div className="metric-info">
             <h3>Aktif Lisanslı</h3>
             <p className="metric-number">{activeCompanies}</p>
           </div>
         </div>
         <div className="metric-card warning">
-          <span className="metric-icon">❄️</span>
+          <span className="metric-icon"></span>
           <div className="metric-info">
             <h3>Dondurulmuş Şirketler</h3>
             <p className="metric-number">{frozenCompanies}</p>
@@ -329,7 +330,7 @@ const SuperAdminDashboard = () => {
 
       <div className="overview-summary-grid">
         <div className="summary-card expiring-card">
-          <h3>⚠️ Lisansı Yakında Bitecek Firmalar (Son 30 Gün)</h3>
+          <h3>Lisansı Yakında Bitecek Firmalar (Son 30 Gün)</h3>
           {expiringSoonCompanies.length > 0 ? (
             <div className="expiring-list">
               {expiringSoonCompanies.map(c => {
@@ -337,7 +338,7 @@ const SuperAdminDashboard = () => {
                 return (
                   <div key={c.id} className="expiring-item">
                     <span className="exp-name">{c.name}</span>
-                    <span className="exp-badge">{daysLeft} gün kaldı (📅 {c.license_end_date})</span>
+                    <span className="exp-badge">{daysLeft} gün kaldı ({c.license_end_date})</span>
                   </div>
                 );
               })}
@@ -348,13 +349,13 @@ const SuperAdminDashboard = () => {
         </div>
 
         <div className="summary-card stats-summary-card">
-          <h3>⚡ Hızlı Eylemler</h3>
+          <h3>Hızlı Eylemler</h3>
           <div className="quick-actions-list">
             <button onClick={() => setActiveTab('add-company')} className="quick-action-btn primary-action">
-              ➕ Yeni Şirket Tanımla
+              Yeni Şirket Tanımla
             </button>
             <button onClick={() => setActiveTab('companies')} className="quick-action-btn secondary-action">
-              📂 Şirket Listesini İncele
+              Şirket Listesini İncele
             </button>
           </div>
         </div>
@@ -375,7 +376,7 @@ const SuperAdminDashboard = () => {
       </div>
 
       <div className="list-filter-bar">
-        <span className="filter-icon">🔍</span>
+        <span className="filter-icon"><Search size={16} /></span>
         <input
           type="text"
           className="list-filter-input"
@@ -384,7 +385,7 @@ const SuperAdminDashboard = () => {
           onChange={e => setCompanyFilter(e.target.value)}
         />
         {companyFilter && (
-          <button className="filter-clear-btn" onClick={() => setCompanyFilter('')}>✕</button>
+          <button className="filter-clear-btn" onClick={() => setCompanyFilter('')}><X size={14} /></button>
         )}
       </div>
 
@@ -409,7 +410,7 @@ const SuperAdminDashboard = () => {
                 </td>
                 <td>
                   <span className={`license-date-badge ${new Date(company.license_end_date) < new Date() ? 'expired' : ''}`}>
-                    📅 {company.license_end_date}
+                    {company.license_end_date}
                   </span>
                 </td>
                 <td>
@@ -425,21 +426,21 @@ const SuperAdminDashboard = () => {
                         className={`action-btn-small ${company.is_active ? 'freeze' : 'activate'}`}
                         title={company.is_active ? 'Şirket Erişimini Dondur' : 'Şirket Erişimini Aktifleştir'}
                       >
-                        {company.is_active ? '❄️ Dondur' : '⚡ Aktif Et'}
+                        {company.is_active ? 'Dondur' : 'Aktif Et'}
                       </button>
                       <button 
                         onClick={() => handleExtendLicense(company.id, company.license_end_date)} 
                         className="action-btn-small extend"
                         title="Lisans Süresini 30 Gün Uzat"
                       >
-                        ➕ 30 Gün Uzat
+                        30 Gün Uzat
                       </button>
                       <button 
                         onClick={() => setEditingCompany({ ...company, password: '' })} 
                         className="action-btn-small edit-btn"
                         title="Şirketi Düzenle"
                       >
-                        ✏️ Düzenle
+                        Düzenle
                       </button>
                     </div>
                     
@@ -542,10 +543,10 @@ const SuperAdminDashboard = () => {
     <section className="audit-logs-section no-margin-top">
       <div className="section-title-row">
         <h2>Sistem İşlem Geçmişi (Audit Logs)</h2>
-        <button onClick={fetchLogs} className="refresh-logs-btn">🔄 Listeyi Yenile</button>
+        <button onClick={fetchLogs} className="refresh-logs-btn"><RefreshCw size={14} className="btn-icon" /> Listeyi Yenile</button>
       </div>
       <div className="list-filter-bar">
-        <span className="filter-icon">🔍</span>
+        <span className="filter-icon"><Search size={16} /></span>
         <input
           type="text"
           className="list-filter-input"
@@ -554,7 +555,7 @@ const SuperAdminDashboard = () => {
           onChange={e => setSuperLogFilter(e.target.value)}
         />
         {superLogFilter && (
-          <button className="filter-clear-btn" onClick={() => setSuperLogFilter('')}>✕</button>
+          <button className="filter-clear-btn" onClick={() => setSuperLogFilter('')}><X size={14} /></button>
         )}
       </div>
       <div className="logs-table-container">
@@ -586,7 +587,7 @@ const SuperAdminDashboard = () => {
                 })
                 .map(log => (
                 <tr key={log.id}>
-                  <td className="log-time">⏱️ {log.timestamp}</td>
+                  <td className="log-time">{log.timestamp}</td>
                   <td className="log-user">{log.user_email}</td>
                   <td className="log-action">{log.action}</td>
                   <td className="log-ip">{log.ip_address || '127.0.0.1'}</td>
@@ -609,7 +610,7 @@ const SuperAdminDashboard = () => {
       <div className="modal-content">
         <div className="modal-header">
           <h2>Şirket ve Yönetici Güncellemesi</h2>
-          <button onClick={() => setEditingCompany(null)} className="close-modal-btn">✕</button>
+          <button onClick={() => setEditingCompany(null)} className="close-modal-btn"><X size={14} /></button>
         </div>
         <form onSubmit={handleUpdateCompany} className="modal-form">
           <div className="form-group">
@@ -675,7 +676,7 @@ const SuperAdminDashboard = () => {
       {/* Sol Sidebar */}
       <aside className="sidebar">
         <div className="sidebar-brand">
-          <span className="logo-icon">⚡</span>
+          <span className="logo-icon"><Zap size={24} color="#7c3aed" /></span>
           <div className="brand-meta">
             <span className="logo-text">Shift<span className="accent">App</span></span>
             <span className="sidebar-role">Süper Admin</span>
@@ -687,31 +688,31 @@ const SuperAdminDashboard = () => {
             onClick={() => setActiveTab('overview')} 
             className={`sidebar-item ${activeTab === 'overview' ? 'active' : ''}`}
           >
-            📊 Genel Bakış
+            <LayoutDashboard size={18} className="sidebar-icon" /> Genel Bakış
           </button>
           <button 
             onClick={() => setActiveTab('companies')} 
             className={`sidebar-item ${activeTab === 'companies' ? 'active' : ''}`}
           >
-            🏢 Şirket Listesi
+            <Building2 size={18} className="sidebar-icon" /> Şirket Listesi
           </button>
           <button 
             onClick={() => setActiveTab('add-company')} 
             className={`sidebar-item ${activeTab === 'add-company' ? 'active' : ''}`}
           >
-            ➕ Şirket Kaydet
+            <Settings size={18} className="sidebar-icon" /> Şirket Kaydet
           </button>
           <button 
             onClick={() => setActiveTab('logs')} 
             className={`sidebar-item ${activeTab === 'logs' ? 'active' : ''}`}
           >
-            ⏱️ Sistem Günlüğü
+            Sistem Günlüğü
           </button>
         </nav>
 
         <div className="sidebar-footer">
           <button onClick={handleLogout} className="logout-sidebar-btn">
-            ↪ Güvenli Çıkış
+            <LogOut size={18} className="sidebar-icon" /> Güvenli Çıkış
           </button>
         </div>
       </aside>
@@ -729,7 +730,7 @@ const SuperAdminDashboard = () => {
             <p>Şirketleri, lisans sürelerini ve yönetici erişimlerini tek merkezden yönetin.</p>
           </div>
           <div className="user-profile-badge">
-            <span className="user-avatar">👑</span>
+            <div className="user-avatar"><Crown size={20} /></div>
             <div className="user-details">
               <span className="user-email">{localStorage.getItem('email') || 'superadmin@shiftapp.com'}</span>
               <span className="user-role-label">Sistem Yöneticisi</span>
@@ -740,7 +741,7 @@ const SuperAdminDashboard = () => {
         <div className="content-container">
           {message && (
             <div className={`dashboard-alert ${messageType}`}>
-              {messageType === 'success' ? '✅' : '❌'} {message}
+              {messageType === 'success' ? '' : ''} {message}
             </div>
           )}
 

@@ -1,4 +1,5 @@
 import React from 'react';
+import { Zap } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import './Navbar.css';
 
@@ -7,7 +8,7 @@ const Navbar = () => {
     <nav className="navbar">
       <div className="navbar-container">
         <Link to="/" className="navbar-logo">
-          <span className="logo-icon">⚡</span>
+          <span className="logo-icon"><Zap size={24} color="#7c3aed" /></span>
           <span className="logo-text">Shift<span className="accent">App</span></span>
         </Link>
         

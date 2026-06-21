@@ -896,7 +896,8 @@
   color: var(--text-secondary);
 }
 
-.modal-form input {
+.modal-form input,
+.modal-form select {
   background: var(--bg-dark-soft);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
@@ -907,7 +908,8 @@
   transition: var(--transition-fast);
 }
 
-.modal-form input:focus {
+.modal-form input:focus,
+.modal-form select:focus {
   outline: none;
   border-color: var(--primary-color);
   box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);

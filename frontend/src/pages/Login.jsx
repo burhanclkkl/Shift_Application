@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Zap, Mail, Eye, EyeOff, Lock } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 import { API_BASE_URL } from '../config';
 import './Login.css';
@@ -113,7 +114,7 @@ const Login = () => {
         <div className="login-card">
           <div className="login-card-header">
             <div className="login-logo">
-              <span className="logo-icon">⚡</span>
+              <span className="logo-icon"><Zap size={24} color="#7c3aed" /></span>
               <span className="logo-text">Shift<span className="accent">App</span></span>
             </div>
             <p className="login-subtitle">
@@ -133,7 +134,7 @@ const Login = () => {
             <div className="input-group">
               <label htmlFor="email">E-posta Adresi</label>
               <div className="input-wrapper">
-                <span className="input-icon">✉️</span>
+                <span className="input-icon"><Mail size={18} /></span>
                 <input 
                   type="email" 
                   id="email" 
@@ -149,7 +150,7 @@ const Login = () => {
             <div className="input-group">
               <label htmlFor="password">Şifre</label>
               <div className="input-wrapper">
-                <span className="input-icon">🔒</span>
+                <span className="input-icon"><Lock size={18} /></span>
                 <input 
                   type={showPassword ? "text" : "password"} 
                   id="password" 
@@ -165,7 +166,7 @@ const Login = () => {
                   onClick={() => setShowPassword(!showPassword)}
                   disabled={loading || cooldown > 0}
                 >
-                  {showPassword ? '👁️' : '🙈'}
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>
             </div>
