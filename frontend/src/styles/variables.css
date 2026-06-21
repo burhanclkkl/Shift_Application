@@ -1,0 +1,44 @@
+/* Tasarım Sistemi - Global CSS Değişkenleri (CSS Variables) - Aydınlık (Light) Tema */
+
+:root {
+  /* Renk Paleti (Aydınlık & Canlı Renkler) */
+  --primary-color: #7c3aed;       /* Canlı Mor */
+  --primary-hover: #6d28d9;
+  --secondary-color: #2563eb;     /* Canlı Mavi */
+  --secondary-hover: #1d4ed8;
+  
+  --bg-dark: #ffffff;             /* Ana Arka Plan */
+  --bg-dark-soft: #f8fafc;        /* Hafif Gri Geçiş Arka Planı */
+  --bg-card: rgba(255, 255, 255, 0.75); /* Aydınlık Cam Kart Arka Planı (Glassmorphism) */
+  --bg-card-hover: rgba(255, 255, 255, 0.95);
+  
+  --border-color: rgba(15, 23, 42, 0.08); /* Yumuşak Çizgiler */
+  --border-hover: rgba(124, 58, 237, 0.3);
+  
+  --text-primary: #0f172a;        /* Koyu Gri (Slate 900) */
+  --text-secondary: #475569;      /* Orta Koyu Gri (Slate 600) */
+  --text-muted: #94a3b8;          /* Silik Gri (Slate 400) */
+  
+  --success: #10b981;             /* Yeşil */
+  --error: #ef4444;               /* Kırmızı */
+  --warning: #f59e0b;             /* Turuncu */
+  
+  /* Font Ailesi */
+  --font-family: 'Outfit', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  
+  /* Gölgeler ve Yumuşak Işımalar (Aydınlık Temaya Uygun) */
+  --glow-primary: 0 10px 30px rgba(124, 58, 237, 0.15);
+  --glow-secondary: 0 10px 30px rgba(37, 99, 235, 0.15);
+  --card-shadow: 0 20px 40px -15px rgba(15, 23, 42, 0.08), 0 0 0 1px rgba(15, 23, 42, 0.04);
+  
+  /* Border Radius */
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 24px;
+  --radius-full: 9999px;
+  
+  /* Animasyon ve Geçiş Hızları */
+  --transition-fast: 0.2s ease;
+  --transition-normal: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 0.5s ease;
+}
